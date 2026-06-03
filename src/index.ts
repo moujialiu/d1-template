@@ -1,51 +1,61 @@
 export default {
-  async fetch(req, env) {
+	async fetch(req, env) {
+		const url = new URL(req.url)
 
-    // 处理预检请求 (OPTIONS)
-    if (req.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",                // 允许所有域访问
-          "Access-Control-Allow-Methods": "POST,OPTIONS",   // 允许的方法
-          "Access-Control-Allow-Headers": "Content-Type",   // 允许的请求头
-        }
-      });
-    }
+		const cors = {
+			"Access-Control-Allow-Origin":"*",
+			"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+			"Access-Control-Allow-Headers":"Content-Type"
+		}
 
-    // 处理 POST
-    if (req.method === "POST") {
-      try {
-        const data = await req.json();
+		if (req.method === "OPTIONS") {
+			return new Response(null, {headers: cors})
+		}
 
-        // 获取真实 IP（Cloudflare 会在请求头里添加）
-        const ip = req.headers.get("CF-Connecting-IP") || req.headers.get("x-forwarded-for") || "unknown";
+		// ---------- 日志 KV ----------
+		if (url.pathname === "/log" && req.method === "POST") {
+			const data = await req.json()
+			await env.EVENTS.put(
+				crypto.randomUUID(),
+				JSON.stringify({
+					...data,
+					ip: req.headers.get("CF-Connecting-IP"),
+					createdAt: Date.now()
+				})
+			)
 
-        // 组合完整数据
-        const eventData = {
-          ...data,
-          ip,
-          received_at: new Date().toISOString()
-        };
+			return Response.json({ok:true}, {headers:cors})
+		}
 
-        // 存入 KV
-        const id = crypto.randomUUID();
-        await env.EVENTS.put(id, JSON.stringify(eventData));
+		// ---------- 评论 D1 ----------
+		if (url.pathname === "/comment" && req.method === "POST") {
+			const data = await req.json()
+			await env.DB.prepare(`
+				INSERT INTO comments
+				(
+					id,
+					content,
+					created_at
+				)
+				VALUES(?1,?2,?3)
+			`)
+			.bind(crypto.randomUUID(), data.content, Date.now())
+			.run()
 
-        return new Response(JSON.stringify({ ok: true, id }), {
-          headers: { "Access-Control-Allow-Origin": "*" , "Content-Type": "application/json"}
-        });
+			return Response.json({ok: true}, {headers: cors})
+		}
 
-      } catch (err) {
-        return new Response(JSON.stringify({ ok: false, error: err.message }), {
-          headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-          status: 400
-        });
-      }
-    }
+		if (url.pathname === "/comment" && req.method === "GET") {
+			const result = await env.DB.prepare(`
+				SELECT *
+				FROM comments
+				ORDER BY created_at DESC
+				LIMIT 20
+			`).all()
 
-    // GET 或其他方法返回提示
-    return new Response(JSON.stringify({ ok: true, message: "Worker ready" }), {
-      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" }
-    });
-  }
+			return Response.json(result.results, {headers: cors})
+		}
+
+		return new Response("Not Found", {status:404})
+	}
 }
