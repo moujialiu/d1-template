@@ -23,7 +23,7 @@
 	"kv_namespaces": [
     {
       "binding": "EVENTS",
-      "id": "events_storage"
+      "id": "events-storage"
     }
   ],
 }
