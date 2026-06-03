@@ -1,0 +1,29 @@
+{
+	"compatibility_date": "2026-06-03",
+	"main": "src/index.ts",
+	"name": "d1-template",
+	"upload_source_maps": true,
+	// D1绑定
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_id": "b05ef8f6-da07-4a4f-a376-381c7e370f80",
+			"database_name": "d1-template-database"
+		}
+	],
+	"routes": [
+		{ "pattern": "api.xs-js.top/*", "zone_name": "xs-js.top" }
+	],
+	"observability": {
+		"enabled": true
+	},
+	// 关闭 xxx.workers.dev
+	"workers_dev": false,
+	// KV绑定
+	"kv_namespaces": [
+    {
+      "binding": "EVENTS",
+      "id": "events_storage"
+    }
+  ],
+}
